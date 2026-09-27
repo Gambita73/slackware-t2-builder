@@ -1,0 +1,13 @@
+Slackware-T2 builder
+
+Mount the stock Slackware 15.0 ISO at /mnt/slackware, then run:
+
+  sudo ./build.sh
+
+The finished ISO will be written to:
+
+  output/slackware-t2.iso
+
+To use a different mounted source tree:
+
+  sudo env SLACKWARE_SOURCE=/path/to/mounted/slackware ./build.sh

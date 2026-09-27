@@ -1,0 +1,408 @@
+#!/bin/sh
+
+
+# Slackware installer integration for Apple T2 Macs.
+
+TMP=/var/log/setup/tmp
+BOOTARGS="intel_iommu=on iommu=pt pm_async=off"
+
+
+fail() {
+  MESSAGE="$1"
+
+  if command -v dialog >/dev/null 2>&1 ; then
+    dialog --title "SLACKWARE-T2 ERROR" --msgbox "$MESSAGE" 0 0
+  else
+    echo "Slackware-T2: ERROR: $MESSAGE" >&2
+  fi
+
+  exit 1
+}
+
+
+info() {
+  MESSAGE="$1"
+
+  if command -v dialog >/dev/null 2>&1 ; then
+    dialog --title "SLACKWARE-T2" --infobox "$MESSAGE" 5 65
+  else
+    echo "Slackware-T2: $MESSAGE"
+  fi
+}
+
+
+
+# Locate installed Slackware system.
+
+[ -r "$TMP/SeTT_PX" ] || fail \
+  "Unable to locate the Slackware installation target."
+
+T_PX="$(cat "$TMP/SeTT_PX")"
+
+[ -n "$T_PX" ] || fail \
+  "Slackware installation target is empty."
+
+[ -d "$T_PX/etc" ] || fail \
+  "The target system does not contain /etc."
+
+[ -d "$T_PX/boot" ] || fail \
+  "The target system does not contain /boot."
+
+[ -d "$T_PX/lib/modules" ] || fail \
+  "The target system does not contain kernel modules."
+
+
+info "Configuring Apple T2 support..."
+
+
+
+# Determine the T2 kernel version.
+
+KERNEL_VERSION_LIST="$(
+  find "$T_PX/lib/modules" -type f -name 't2bce_vhci.ko*' 2>/dev/null |
+  sed "s#^$T_PX/lib/modules/##" |
+  cut -d/ -f1 |
+  sort -u
+)"
+
+KERNEL_COUNT="$(
+  printf '%s\n' "$KERNEL_VERSION_LIST" |
+  sed '/^$/d' |
+  wc -l |
+  tr -d ' '
+)"
+
+[ "$KERNEL_COUNT" -eq 1 ] || fail \
+  "Unable to uniquely determine the Slackware-T2 kernel version.
+
+Found:
+$KERNEL_VERSION_LIST"
+
+KERNEL_VERSION="$KERNEL_VERSION_LIST"
+
+
+
+# Verify the essential T2 BCE modules.
+
+for MODULE in t2bce_dma t2bce_core t2bce_vhci ; do
+  if ! find "$T_PX/lib/modules/$KERNEL_VERSION" \
+      -type f -name "${MODULE}.ko*" |
+      grep -q . ; then
+
+    fail "Required T2 kernel module is missing: $MODULE"
+  fi
+done
+
+
+
+# Verify that the matching huge kernel was installed.
+
+KERNEL_IMAGE="$T_PX/boot/vmlinuz-huge-$KERNEL_VERSION"
+
+[ -r "$KERNEL_IMAGE" ] || fail \
+  "The matching Slackware-T2 kernel was not installed:
+
+/boot/vmlinuz-huge-$KERNEL_VERSION"
+
+
+
+# Regenerate module dependency information.
+
+if [ -x "$T_PX/sbin/depmod" ]; then
+  chroot "$T_PX" /sbin/depmod -a "$KERNEL_VERSION" ||
+    fail "depmod failed for kernel $KERNEL_VERSION."
+else
+  fail "/sbin/depmod is missing from the installed system."
+fi
+
+
+
+# Configure Slackware module loading.
+
+RC_MODULES_LOCAL="$T_PX/etc/rc.d/rc.modules.local"
+
+if [ ! -f "$RC_MODULES_LOCAL" ]; then
+  cat > "$RC_MODULES_LOCAL" <<'EOF'
+#!/bin/sh
+#
+# /etc/rc.d/rc.modules.local
+#
+# Local kernel module configuration.
+#
+EOF
+fi
+
+if ! grep -q 'BEGIN SLACKWARE-T2' "$RC_MODULES_LOCAL" ; then
+  cat >> "$RC_MODULES_LOCAL" <<'EOF'
+
+# BEGIN SLACKWARE-T2
+# Load the Apple T2 BCE stack.
+/sbin/modprobe t2bce_vhci
+# END SLACKWARE-T2
+EOF
+fi
+
+chmod 755 "$RC_MODULES_LOCAL"
+
+
+
+# Verify T2FanRD.
+
+[ -x "$T_PX/usr/sbin/t2fanrd" ] || fail \
+  "/usr/sbin/t2fanrd is missing."
+
+[ -f "$T_PX/etc/rc.d/rc.t2fanrd" ] || fail \
+  "/etc/rc.d/rc.t2fanrd is missing."
+
+chmod 755 "$T_PX/etc/rc.d/rc.t2fanrd"
+
+
+
+# Start T2FanRD during normal Slackware startup.
+
+RC_LOCAL="$T_PX/etc/rc.d/rc.local"
+
+if [ ! -f "$RC_LOCAL" ]; then
+  cat > "$RC_LOCAL" <<'EOF'
+#!/bin/sh
+#
+# /etc/rc.d/rc.local
+#
+# Local system initialization.
+#
+EOF
+fi
+
+if ! grep -q 'BEGIN SLACKWARE-T2-FAN' "$RC_LOCAL" ; then
+  cat >> "$RC_LOCAL" <<'EOF'
+
+# BEGIN SLACKWARE-T2-FAN
+if [ -x /etc/rc.d/rc.t2fanrd ]; then
+  /etc/rc.d/rc.t2fanrd start
+fi
+# END SLACKWARE-T2-FAN
+EOF
+fi
+
+if ! grep -q 'rc.t2firmware' "$RC_LOCAL" ; then
+  cat >> "$RC_LOCAL" <<'EOF'
+
+if [ -x /etc/rc.d/rc.t2firmware ]; then
+  /etc/rc.d/rc.t2firmware
+fi
+EOF
+fi
+
+chmod 755 "$RC_LOCAL"
+
+
+
+# Verify Apple firmware helper.
+
+[ -x "$T_PX/usr/sbin/get-apple-firmware" ] || fail \
+  "/usr/sbin/get-apple-firmware is missing."
+
+[ -f "$T_PX/etc/rc.d/rc.t2firmware" ] || fail \
+  "/etc/rc.d/rc.t2firmware is missing."
+
+chmod 755 "$T_PX/etc/rc.d/rc.t2firmware"
+
+
+
+# Verify T2 network configuration.
+
+[ -r "$T_PX/etc/udev/rules.d/99-network-t2-ncm.rules" ] || fail \
+  "T2 NCM udev configuration is missing."
+
+[ -r "$T_PX/etc/NetworkManager/conf.d/99-network-t2-ncm.conf" ] || fail \
+  "T2 NetworkManager configuration is missing."
+
+
+
+# Configure Slackware kernel symlinks.
+
+cd "$T_PX/boot" || fail "Unable to access /boot."
+
+rm -f vmlinuz
+ln -s "vmlinuz-huge-$KERNEL_VERSION" vmlinuz
+
+rm -f vmlinuz-huge
+ln -s "vmlinuz-huge-$KERNEL_VERSION" vmlinuz-huge
+
+
+if [ -r "config-huge-${KERNEL_VERSION}.x64" ]; then
+  rm -f config
+  ln -s "config-huge-${KERNEL_VERSION}.x64" config
+elif [ -r "config-huge-$KERNEL_VERSION" ]; then
+  rm -f config
+  ln -s "config-huge-$KERNEL_VERSION" config
+else
+  fail "Kernel configuration for $KERNEL_VERSION is missing."
+fi
+
+
+if [ -r "System.map-huge-$KERNEL_VERSION" ]; then
+  rm -f System.map
+  ln -s "System.map-huge-$KERNEL_VERSION" System.map
+else
+  fail "System.map for $KERNEL_VERSION is missing."
+fi
+
+
+
+[ -x "$T_PX/usr/sbin/grub-install" ] || fail \
+  "/usr/sbin/grub-install is missing."
+
+[ -x "$T_PX/usr/sbin/grub-mkconfig" ] || fail \
+  "/usr/sbin/grub-mkconfig is missing."
+
+blkid_value() {
+  chroot "$T_PX" /sbin/blkid -p -o value -s "$1" "$2" 2>/dev/null
+}
+
+disk_of() {
+  basename "$(dirname "$(readlink -f "/sys/class/block/${1#/dev/}")")"
+}
+
+EFI_TYPE="c12a7328-f81f-11d2-ba4b-00a0c93ec93b"
+
+ROOT_DEVICE="$(mount | grep -F " on $T_PX " | cut -d ' ' -f 1 | head -n 1)"
+
+[ -r "/sys/class/block/${ROOT_DEVICE#/dev/}/partition" ] || fail \
+  "Unable to determine the disk that contains $ROOT_DEVICE."
+
+ROOT_DISK="$(disk_of "$ROOT_DEVICE")"
+
+[ "$(blkid_value PTTYPE "/dev/$ROOT_DISK")" = "gpt" ] || fail \
+  "/dev/$ROOT_DISK does not use a GPT partition table.
+
+The Mac can only start Slackware from a GPT disk.
+Partition it again with cfdisk, choose gpt, and run setup again."
+
+EFI_DEVICE="$(mount | grep -F " on $T_PX/boot/efi " | cut -d ' ' -f 1 | head -n 1)"
+
+if [ -z "$EFI_DEVICE" ] ||
+   [ "$(blkid_value PART_ENTRY_TYPE "$EFI_DEVICE")" != "$EFI_TYPE" ] ||
+   [ "$(disk_of "$EFI_DEVICE")" != "$ROOT_DISK" ] ; then
+
+  EFI_DEVICE=""
+
+  for PART in /sys/block/"$ROOT_DISK"/"$ROOT_DISK"* ; do
+    if [ "$(blkid_value PART_ENTRY_TYPE "/dev/${PART##*/}")" = "$EFI_TYPE" ] ; then
+      EFI_DEVICE="/dev/${PART##*/}"
+      break
+    fi
+  done
+fi
+
+[ -n "$EFI_DEVICE" ] || fail \
+  "No EFI System partition was found on /dev/$ROOT_DISK.
+
+In cfdisk, give a 512 MB partition on /dev/$ROOT_DISK
+the type 'EFI System' and run setup again."
+
+if mount | grep -F " on $T_PX/boot/efi " | grep -v -q "^$EFI_DEVICE " ; then
+  umount "$T_PX/boot/efi" ||
+    fail "Unable to unmount /boot/efi."
+fi
+
+EFI_STATE="$(
+  chroot "$T_PX" /usr/bin/od -An -tu1 -v -N 48 "$EFI_DEVICE" 2>/dev/null |
+  chroot "$T_PX" /usr/bin/awk '
+    { for (i = 1; i <= NF; i++) b[n++] = $i }
+    END {
+      bps = b[11] + b[12] * 256
+      spc = b[13]
+      if (n < 48 || bps == 0 || spc == 0) exit
+      sectors = b[19] + b[20] * 256
+      if (sectors == 0) sectors = b[32] + b[33] * 256 + b[34] * 65536 + b[35] * 16777216
+      fat = b[22] + b[23] * 256
+      fat32 = (fat == 0)
+      if (fat32) fat = b[36] + b[37] * 256 + b[38] * 65536 + b[39] * 16777216
+      root = int(((b[17] + b[18] * 256) * 32 + bps - 1) / bps)
+      clusters = int((sectors - (b[14] + b[15] * 256) - b[16] * fat - root) / spc)
+      print (((fat32 && clusters >= 65525) || (!fat32 && clusters < 65525)) ? "ok" : "bad")
+    }'
+)"
+
+if [ "$(blkid_value TYPE "$EFI_DEVICE")" != "vfat" ] || [ "$EFI_STATE" = "bad" ] ; then
+  umount "$T_PX/boot/efi" 2>/dev/null
+
+  EFI_SIZE="$(cat "/sys/class/block/${EFI_DEVICE#/dev/}/size")"
+  EFI_SECTOR="$(cat "/sys/block/$ROOT_DISK/queue/logical_block_size")"
+
+  if [ "$(( EFI_SIZE * 512 / EFI_SECTOR ))" -ge 70000 ] ; then
+    chroot "$T_PX" /sbin/mkfs.fat -F 32 -s 1 -n EFI "$EFI_DEVICE" >/dev/null 2>&1
+  else
+    chroot "$T_PX" /sbin/mkfs.fat -n EFI "$EFI_DEVICE" >/dev/null 2>&1
+  fi || fail "Unable to format $EFI_DEVICE as FAT."
+fi
+
+if [ "$(blkid_value LABEL "$EFI_DEVICE")" != "EFI" ] ; then
+  umount "$T_PX/boot/efi" 2>/dev/null
+  chroot "$T_PX" /sbin/fatlabel "$EFI_DEVICE" EFI >/dev/null 2>&1
+fi
+
+mkdir -p "$T_PX/boot/efi"
+
+if ! mount | grep -F " on $T_PX/boot/efi " >/dev/null 2>&1 ; then
+  mount -t vfat "$EFI_DEVICE" "$T_PX/boot/efi" ||
+    fail "Unable to mount $EFI_DEVICE on /boot/efi."
+fi
+
+if ! grep -q "^$EFI_DEVICE[[:space:]][[:space:]]*/boot/efi[[:space:]]" "$T_PX/etc/fstab" 2>/dev/null ; then
+  sed -i '\#[[:space:]]/boot/efi[[:space:]]#d' "$T_PX/etc/fstab" 2>/dev/null
+  printf '%-16s %-16s %-11s %-16s %-3s %s\n' \
+    "$EFI_DEVICE" "/boot/efi" "vfat" "defaults" "1" "0" >> "$T_PX/etc/fstab"
+fi
+
+GRUB_DEFAULT="$T_PX/etc/default/grub"
+
+mkdir -p "$T_PX/etc/default"
+
+if [ -f "$GRUB_DEFAULT" ] && grep -q '^GRUB_CMDLINE_LINUX=' "$GRUB_DEFAULT" ; then
+  sed -i \
+    "s#^GRUB_CMDLINE_LINUX=.*#GRUB_CMDLINE_LINUX=\"$BOOTARGS\"#" \
+    "$GRUB_DEFAULT" ||
+    fail "Unable to configure GRUB kernel parameters."
+else
+  printf 'GRUB_CMDLINE_LINUX="%s"\n' "$BOOTARGS" >> "$GRUB_DEFAULT"
+fi
+
+chroot "$T_PX" /usr/sbin/grub-install \
+  --target=x86_64-efi \
+  --efi-directory=/boot/efi \
+  --bootloader-id=Slackware-T2 \
+  --no-nvram \
+  --removable ||
+  fail "GRUB installation failed."
+
+chroot "$T_PX" /usr/sbin/grub-mkconfig \
+  -o /boot/grub/grub.cfg ||
+  fail "GRUB configuration generation failed."
+
+[ -r "$T_PX/boot/efi/EFI/BOOT/BOOTX64.EFI" ] || fail \
+  "GRUB removable EFI loader was not installed."
+
+rm -rf "$T_PX/boot/efi/EFI/Slackware"
+
+[ -r "$T_PX/boot/grub/grub.cfg" ] || fail \
+  "GRUB configuration was not generated."
+
+
+
+# Record Slackware-T2 configuration.
+
+mkdir -p "$T_PX/etc/slackware-t2"
+
+printf '%s\n' "$BOOTARGS" \
+  > "$T_PX/etc/slackware-t2/kernel-command-line"
+
+printf '%s\n' "$KERNEL_VERSION" \
+  > "$T_PX/etc/slackware-t2/kernel-version"
+
+
+
+info "Apple T2 support configured for kernel $KERNEL_VERSION."
+
+exit 0
