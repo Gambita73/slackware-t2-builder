@@ -8,6 +8,8 @@ The builder takes the official Slackware64 15.0 DVD ISO and turns it into an ins
 
 The ISO contains no Apple firmware, so it can be shared. Each Mac gets its Wi-Fi and Bluetooth firmware from Apple's own copy after installation.
 
+# [Download](https://sourceforge.net/projects/slackware-t2-builder/files/)
+
 ## What's included
 
 - **Kernel**: the latest kernel supported by the t2linux kernel releases at build time, built from Slackware's huge configuration plus the t2linux patches. It replaces kernel-huge, kernel-modules and kernel-source; kernel-generic is removed.
