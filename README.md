@@ -140,7 +140,7 @@ The iMac19,1, iMac19,2 and iMacPro1,1 need extra files that this automatic setup
 
 - [t2linux](https://wiki.t2linux.org): kernel patches, documentation and the Wi-Fi firmware script.
 - [T2FanRD](https://github.com/GnomedDev/T2FanRD): fan daemon.
-- [Slackware Linux](http://www.slackware.com): the distribution and the GRUB package.
+- [Slackware Linux](http://www.slackware.com): For the amazing Slackware distribution :-)
 
 ## Disclaimer
 
