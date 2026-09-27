@@ -110,10 +110,6 @@ After the ISO is built, `build.sh` checks its boot records, packages and install
 4. At the end, setup installs GRUB. If the EFI partition can't be used, setup stops and says what to change.
 5. Reboot and remove the USB stick.
 
-### First boot
-
-The Mac doesn't start a newly installed Linux system by itself. Power on holding **Option**, then hold **Control** and press **Enter** on **EFI Boot**. This makes Slackware the default startup disk, so later boots go straight to GRUB.
-
 ### Wi-Fi and Bluetooth
 
 Apple's Wi-Fi and Bluetooth firmware can't be shipped on the ISO. On each boot until it's installed, Slackware-T2 looks for it in two places:
@@ -139,12 +135,6 @@ The copy stays on the EFI partition, so later reinstalls pick it up automaticall
 
 The iMac19,1, iMac19,2 and iMacPro1,1 need extra files that this automatic setup doesn't install yet. See the [t2linux Wi-Fi guide](https://wiki.t2linux.org/guides/wifi-bluetooth/) for these models.
 
-## Troubleshooting
-
-- **The Mac shows a question mark or `support.apple.com/mac/startup`**: hold **Option** at power-on and choose **EFI Boot**. Hold **Control** while pressing **Enter** to make it the default.
-- **No EFI Boot icon for the SSD**: the EFI partition must be on a GPT disk, have the type **EFI System**, and be formatted as FAT. Setup checks and fixes the format, and stops if the partition table or type is wrong.
-- **No Wi-Fi**: check that `/boot/efi/firmware-raw.tar.gz` exists, or that macOS is still on the SSD. Then run `/etc/rc.d/rc.t2firmware` as root, and `dmesg | grep brcmfmac` to see which firmware the driver asked for.
-- **Trackpad settings**: tap-to-click and other options are in **System Settings → Input Devices → Touchpad**.
 
 ## Credits
 
