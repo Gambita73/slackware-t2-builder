@@ -23,7 +23,11 @@ The ISO contains no Apple firmware, so it can be shared. Each Mac gets its Wi-Fi
   - trackpad settings for libinput, for both X11 and Wayland
   - automatic Wi-Fi and Bluetooth firmware setup, plus the t2linux get-apple-firmware script
 
-Not included: the audio configuration files (apple-t2-audio-config) and tiny-dfr for Touch Bar customization.
+## Not included:
+
+-The PulseAudio/PipeWire profile files for T2 audio (t2-better-audio, packaged by some distributions as apple-t2-audio-config). The audio driver and the kernel parameters it needs are included; the [t2linux audio guide](https://wiki.t2linux.org/guides/audio-config/) explains how to add the profile files.
+
+-tiny-dfr for Touch Bar customization.
 
 ## Supported Macs
 
