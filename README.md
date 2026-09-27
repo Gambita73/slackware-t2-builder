@@ -1,4 +1,6 @@
 # Slackware-T2 Builder
+(Note: I am in my final year of university and am very busy. I will try to keep this project as up to date as possible.)
+
 
 Build a Slackware64 15.0 installer ISO for Intel Macs with the Apple T2 security chip.
 
@@ -8,20 +10,20 @@ The ISO contains no Apple firmware, so it can be shared. Each Mac gets its Wi-Fi
 
 ## What's included
 
-- **Kernel**: the latest kernel supported by the t2linux kernel releases at build time, built from Slackware's `huge` configuration plus the t2linux patches. It replaces `kernel-huge`, `kernel-modules` and `kernel-source`; `kernel-generic` is removed.
+- **Kernel**: the latest kernel supported by the t2linux kernel releases at build time, built from Slackware's huge configuration plus the t2linux patches. It replaces kernel-huge, kernel-modules and kernel-source; kernel-generic is removed.
 - **Drivers**: t2bce (keyboard, trackpad, Touch Bar and audio), Broadcom Wi-Fi (`brcmfmac`) and Bluetooth (`hci_bcm4377`), and APFS.
 - **Installer**: the Slackware installer runs on the T2 kernel, so the built-in keyboard works during setup.
-- **Boot loader**: GRUB 2.12 (from Slackware 15.0 `/testing`) installed to `EFI/BOOT/BOOTX64.EFI` on the EFI partition, without writing to the Mac's NVRAM. LILO and ELILO are not used.
+- **Boot loader**: GRUB 2.12 (from Slackware 15.0 /testing) installed to EFI/BOOT/BOOTX64.EFI on the EFI partition, without writing to the Mac's NVRAM. LILO and ELILO are not used.
 - **EFI partition checks**: at the end of setup the EFI partition is checked and prepared so the Mac's firmware can read it.
-- **Kernel parameters**: `intel_iommu=on iommu=pt pm_async=off`.
-- **`t2-support` package**:
+- **Kernel parameters**: intel_iommu=on iommu=pt pm_async=off.
+- **t2-support package**:
   - [T2FanRD](https://github.com/GnomedDev/T2FanRD) fan daemon, started at boot
-  - `t2bce_vhci` loaded at boot
+  - t2bce_vhci loaded at boot
   - udev and NetworkManager settings for the T2's internal network interface
   - trackpad settings for libinput, for both X11 and Wayland
-  - automatic Wi-Fi and Bluetooth firmware setup, plus the t2linux `get-apple-firmware` script
+  - automatic Wi-Fi and Bluetooth firmware setup, plus the t2linux get-apple-firmware script
 
-Not included: the audio configuration files (`apple-t2-audio-config`) and `tiny-dfr` for Touch Bar customization.
+Not included: the audio configuration files (apple-t2-audio-config) and tiny-dfr for Touch Bar customization.
 
 ## Supported Macs
 
@@ -31,8 +33,8 @@ Intel Macs with the Apple T2 chip. See [Apple's list](https://support.apple.com/
 
 ### Requirements
 
-- An x86_64 Linux machine with internet access and `sudo`.
-- Plenty of free disk space. The kernel is built from source, and the whole build tree is packaged as `kernel-source`.
+- An x86_64 Linux machine with internet access and sudo.
+- Plenty of free disk space. The kernel is built from source, and the whole build tree is packaged as kernel-source.
 - The [Slackware64 15.0 DVD ISO](https://mirrors.slackware.com/slackware/slackware-iso/slackware64-15.0-iso/).
 - These commands: `git curl wget gpg make patch xz xzcat cpio tar find sha256sum md5sum bzip2 xorriso runuser getent nproc`.
 - A kernel build toolchain (gcc, bc, flex, bison, perl, and the libelf and OpenSSL development files).
@@ -116,7 +118,7 @@ The Mac doesn't start a newly installed Linux system by itself. Power on holding
 
 Apple's Wi-Fi and Bluetooth firmware can't be shipped on the ISO. On each boot until it's installed, Slackware-T2 looks for it in two places:
 
-1. `firmware-raw.tar.gz` on the EFI partition, a copy made from macOS Recovery or with Method 1 of the t2linux Wi-Fi guide.
+1. firmware-raw.tar.gz on the EFI partition, a copy made from macOS Recovery or with Method 1 of the t2linux Wi-Fi guide.
 2. The macOS partition on the internal SSD.
 
 When it finds the firmware, it installs it and turns on Wi-Fi and Bluetooth.
@@ -153,3 +155,7 @@ The iMac19,1, iMac19,2 and iMacPro1,1 need extra files that this automatic setup
 ## Disclaimer
 
 This project is not affiliated with Apple, Slackware or t2linux. Use it at your own risk and back up your data before installing.
+
+## AI disclosure 
+
+For this project, 80% of the scripts were written by hand by me. The `build.sh` was entirely written by AI because writing so much Bash gets boring and repetitive. Additionally, some parts of my code were updated by AI because, at the end of the project, I had to make some changes for GRUB and I was already exhausted. All the code was tested.
